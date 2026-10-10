@@ -1,0 +1,110 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions for secure authentication and authorization
+    function isAuthenticated() {
+      return request.auth != null && request.auth.uid != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (request.auth.token.role == 'admin' || 
+         request.auth.token.email.matches('.*@admin\\.campus\\.edu'));
+    }
+
+    // 1. Users Collection
+    // Document ID must match authenticated UID.
+    // Students can read & update their own profile, but cannot escalate their role.
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      
+      allow create: if isOwner(userId) 
+        && request.resource.data.uid == userId
+        && request.resource.data.role == 'student';
+        
+      allow update: if isOwner(userId) 
+        && request.resource.data.uid == userId
+        // Prevent privilege escalation: user cannot change their own role to admin
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']));
+        
+      allow delete: if isAdmin();
+    }
+
+    // 2. Trusted Contacts Collection
+    // Each contact belongs strictly to ownerUid matching authenticated user.
+    match /trusted_contacts/{contactId} {
+      allow read: if isAuthenticated() && resource.data.ownerUid == request.auth.uid;
+      
+      allow create: if isAuthenticated() 
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.name is string
+        && request.resource.data.phone is string;
+        
+      allow update: if isAuthenticated() 
+        && resource.data.ownerUid == request.auth.uid
+        && request.resource.data.ownerUid == request.auth.uid;
+        
+      allow delete: if isAuthenticated() && resource.data.ownerUid == request.auth.uid;
+    }
+
+    // 3. Safety Sessions Collection
+    // Safe-arrival journeys: only owner can read, start, check-in, or cancel.
+    match /safety_sessions/{sessionId} {
+      allow read: if isAuthenticated() && resource.data.ownerUid == request.auth.uid;
+      
+      allow create: if isAuthenticated() 
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.status == 'active';
+        
+      allow update: if isAuthenticated() 
+        && resource.data.ownerUid == request.auth.uid
+        && request.resource.data.ownerUid == request.auth.uid;
+        
+      allow delete: if isAuthenticated() && resource.data.ownerUid == request.auth.uid;
+    }
+
+    // 4. Emergency Alerts Collection
+    // SOS events: only owner can trigger and view their alerts; admin can view all.
+    match /emergency_alerts/{alertId} {
+      allow read: if isAuthenticated() && 
+        (resource.data.ownerUid == request.auth.uid || isAdmin());
+      
+      allow create: if isAuthenticated() 
+        && request.resource.data.ownerUid == request.auth.uid;
+        
+      allow update: if isAuthenticated() 
+        && resource.data.ownerUid == request.auth.uid
+        && request.resource.data.ownerUid == request.auth.uid;
+        
+      allow delete: if isAdmin();
+    }
+
+    // 5. Campus Hazard Reports Collection
+    // Students can submit reports and read their own reports.
+    // Ordinary students CANNOT mark reports as resolved or alter status.
+    match /campus_reports/{reportId} {
+      allow read: if isAuthenticated() && 
+        (resource.data.reporterUid == request.auth.uid || isAdmin());
+      
+      allow create: if isAuthenticated() 
+        && request.resource.data.reporterUid == request.auth.uid
+        && request.resource.data.status == 'submitted';
+        
+      // Only administrators can update report status or delete reports
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // 6. Campus Emergency Directory Collection
+    // Read-only for authenticated students; write restricted to administrators.
+    match /campus_contacts/{contactId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+  }
+}

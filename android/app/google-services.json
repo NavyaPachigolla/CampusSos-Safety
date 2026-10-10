@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "475182956596",
+    "project_id": "campussos-14b1b",
+    "storage_bucket": "campussos-14b1b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:475182956596:android:5cf620bf824a76b9f6ca61",
+        "android_client_info": {
+          "package_name": "com.campussos.campus_sos"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCbU564UQJ5ZWRZ3DuH8YfbDMXo80HMTjs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
